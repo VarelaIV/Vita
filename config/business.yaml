@@ -1,0 +1,45 @@
+# Configuración del negocio — Generado por AgentKit
+negocio:
+  nombre: "Conexión Vital"
+  descripcion: "Venta de suplementos nutricionales y terapias holísticas, incluyendo
+    escaneo de bienestar para detectar desequilibrios en el cuerpo y brindar claridad
+    sobre la salud. También existe oportunidad de negocio para personas que quieran
+    convertirse en distribuidores o agentes de la marca."
+  horario: "Lunes a Domingo de 8am a 10pm"
+
+agente:
+  nombre: "Vita"
+  tono: "Cálido, cercano y amable"
+  casos_de_uso:
+    - "Responder preguntas frecuentes"
+    - "Agendar citas o reservaciones (escaneo de bienestar)"
+    - "Calificar y atender leads / ventas"
+    - "Tomar pedidos de suplementos"
+    - "Soporte post-venta"
+
+agentes_por_ciudad:
+  queretaro:
+    nombre: "Gisela Sevilla"
+    telefono: "5544036244"
+  puebla:
+    - nombre: "Sitka Lopez"
+      telefono: "2221139421"
+    - nombre: "Perla Alejo"
+      telefono: "2222098244"
+  tlaxcala:
+    nombre: "Conexión Vital"
+    telefono: "2212824878"
+  edomex:
+    - nombre: "Juana Herrero"
+      telefono: "5527564840"
+    - nombre: "Nidia González"
+      telefono: "5528565101"
+  cdmx:
+    - nombre: "Juana Herrero"
+      telefono: "5527564840"
+    - nombre: "Nidia González"
+      telefono: "5528565101"
+
+metadata:
+  creado: "2026-04-16"
+  version: "1.0"
