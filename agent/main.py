@@ -66,63 +66,65 @@ async def webhook_verificacion(request: Request):
     return {"status": "ok"}
 
 
+async def procesar_mensajes(request: Request):
+    """Lógica compartida para procesar mensajes de WhatsApp."""
+    mensajes = await proveedor.parsear_webhook(request)
+
+    for msg in mensajes:
+        if msg.es_propio or not msg.texto:
+            continue
+
+        logger.info(f"Mensaje de {msg.telefono}: {msg.texto}")
+
+        historial = await obtener_historial(msg.telefono)
+
+        etiqueta_actual = await obtener_etiqueta(msg.telefono)
+        if not etiqueta_actual:
+            await asignar_etiqueta(msg.telefono, "nuevo_lead")
+
+        respuesta = await generar_respuesta(msg.texto, historial)
+
+        texto_lower = msg.texto.lower()
+        respuesta_lower = respuesta.lower()
+
+        if any(p in texto_lower for p in ["precio", "costo", "cuánto", "cuanto", "información", "info", "qué es", "que es"]):
+            await asignar_etiqueta(msg.telefono, "interesado")
+        elif any(p in texto_lower for p in ["sí quiero", "si quiero", "me interesa", "cuándo", "cuando", "agendar", "cita"]):
+            await asignar_etiqueta(msg.telefono, "interesado")
+        elif any(p in respuesta_lower for p in ["cita agendada", "confirmada", "quedamos el"]):
+            await asignar_etiqueta(msg.telefono, "cita_agendada")
+        elif any(p in respuesta_lower for p in ["otra ciudad", "no tenemos escaneo presencial", "proceso de expansión"]):
+            await asignar_etiqueta(msg.telefono, "otra_ciudad")
+        elif any(p in texto_lower for p in ["negocio", "ingresos", "vender", "socia", "distribuidora"]):
+            await asignar_etiqueta(msg.telefono, "posible_socia")
+
+        etiqueta_nueva = await obtener_etiqueta(msg.telefono)
+        logger.info(f"Etiqueta {msg.telefono}: {etiqueta_nueva}")
+
+        await guardar_mensaje(msg.telefono, "user", msg.texto)
+        await guardar_mensaje(msg.telefono, "assistant", respuesta)
+
+        await proveedor.enviar_mensaje(msg.telefono, respuesta)
+        logger.info(f"Vita respondió a {msg.telefono}: {respuesta[:80]}...")
+
+    return {"status": "ok"}
+
+
 @app.post("/webhook")
 async def webhook_handler(request: Request):
-    """
-    Recibe mensajes de WhatsApp via Whapi.cloud.
-    Procesa el mensaje, genera respuesta con Claude y la envía de vuelta.
-    """
+    """Recibe mensajes de WhatsApp via Whapi.cloud (ruta principal)."""
     try:
-        # Parsear webhook — el proveedor normaliza el formato
-        mensajes = await proveedor.parsear_webhook(request)
-
-        for msg in mensajes:
-            # Ignorar mensajes propios o vacíos
-            if msg.es_propio or not msg.texto:
-                continue
-
-            logger.info(f"Mensaje de {msg.telefono}: {msg.texto}")
-
-            # Obtener historial ANTES de guardar el mensaje actual
-            historial = await obtener_historial(msg.telefono)
-
-            # Asignar etiqueta "nuevo_lead" si es el primer mensaje
-            etiqueta_actual = await obtener_etiqueta(msg.telefono)
-            if not etiqueta_actual:
-                await asignar_etiqueta(msg.telefono, "nuevo_lead")
-
-            # Generar respuesta con Claude (Vita)
-            respuesta = await generar_respuesta(msg.texto, historial)
-
-            # Actualizar etiqueta según el contenido de la conversación
-            texto_lower = msg.texto.lower()
-            respuesta_lower = respuesta.lower()
-
-            if any(p in texto_lower for p in ["precio", "costo", "cuánto", "cuanto", "información", "info", "qué es", "que es"]):
-                await asignar_etiqueta(msg.telefono, "interesado")
-            elif any(p in texto_lower for p in ["sí quiero", "si quiero", "me interesa", "cuándo", "cuando", "agendar", "cita"]):
-                await asignar_etiqueta(msg.telefono, "interesado")
-            elif any(p in respuesta_lower for p in ["cita agendada", "confirmada", "quedamos el"]):
-                await asignar_etiqueta(msg.telefono, "cita_agendada")
-            elif any(p in respuesta_lower for p in ["otra ciudad", "no tenemos escaneo presencial", "proceso de expansión"]):
-                await asignar_etiqueta(msg.telefono, "otra_ciudad")
-            elif any(p in texto_lower for p in ["negocio", "ingresos", "vender", "socia", "distribuidora"]):
-                await asignar_etiqueta(msg.telefono, "posible_socia")
-
-            etiqueta_nueva = await obtener_etiqueta(msg.telefono)
-            logger.info(f"Etiqueta {msg.telefono}: {etiqueta_nueva}")
-
-            # Guardar mensaje del usuario Y respuesta del agente en memoria
-            await guardar_mensaje(msg.telefono, "user", msg.texto)
-            await guardar_mensaje(msg.telefono, "assistant", respuesta)
-
-            # Enviar respuesta por WhatsApp via Whapi.cloud
-            await proveedor.enviar_mensaje(msg.telefono, respuesta)
-
-            logger.info(f"Vita respondió a {msg.telefono}: {respuesta[:80]}...")
-
-        return {"status": "ok"}
-
+        return await procesar_mensajes(request)
     except Exception as e:
         logger.error(f"Error en webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/webhook/messages")
+async def webhook_messages_handler(request: Request):
+    """Ruta alternativa que Whapi.cloud usa para eventos de mensajes."""
+    try:
+        return await procesar_mensajes(request)
+    except Exception as e:
+        logger.error(f"Error en webhook/messages: {e}")
         raise HTTPException(status_code=500, detail=str(e))
